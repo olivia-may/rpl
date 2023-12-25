@@ -74,83 +74,89 @@ int main(int argc, char **argv) {
 
     if (argc < 4) {
         
-        printf("usage: rpl [-h]\n           OLD-TEXT NEW-TEXT FILE\n");
+        printf("usage: rpl [-h]\n           OLD-TEXT NEW-TEXT FILE [FILE ...]\n");
 
         if (argc > 1) {
             if (!strcmp("-h", argv[1]) || !strcmp("--help", argv[1])) {
 
-                printf("Search and replace text in files.\n \
-                    \n \
-                    positional arguments:\n  OLD-TEXT\n  NEW-TEXT\n \
-                    FILE\n \
-                    \n \
-                    optional arguments:\n \
-                    -h, --help\n");
+                printf("Search and replace text in files.\n\npositional arguments:\n  OLD-TEXT\n  NEW-TEXT\n  FILE\n\noptional arguments:\n-h, --help\n");
                 
                 return 0;
             }
         }
 
-        fprintf(stderr, "rpl: error: the following arguments are required: \
-            OLD-TEXT, NEW-TEXT, FILE\n");
+        fprintf(stderr, "rpl: error: the following arguments are required: OLD-TEXT, NEW-TEXT, FILE\n");
     
         return 1;
     }
-    if (access(argv[3], F_OK)) {
 
-        fprintf(stderr, "rpl: error: file not found '%s'\n", argv[3]);
-        return 1;
+    int i;
+
+    for (int i = 3; i < argc; i++) {
+        if (access(argv[i], F_OK)) {
+
+            fprintf(stderr, "rpl: error: file not found '%s'\n", argv[i]);
+            return 1;
+        }
     }
 
     char *stream;
     FILE *file;
-    int i, ch, old_text_len, new_text_len;
+    int j, ch, old_text_len, new_text_len;
     int stream_old_text_diff;
     struct stat statinfo;
     
-    stat(argv[3], &statinfo);
-    old_text_len = strlen(argv[1]);
-    new_text_len = strlen(argv[2]);
-    stream_old_text_diff = statinfo.st_size - old_text_len;
-    if (stream_old_text_diff < 0) {
-        fprintf(stderr, "rpl: error: OLD-TEXT larger than file\n");
-        return 1;
-    }
-   
-    // + 1 for null char
-    stream = (char *)malloc((statinfo.st_size + 1) * sizeof(char));
-    if (!stream) {
-        fprintf(stderr, "rpl: error: Failed to allocate memory to read %s\n",
-            argv[3]);
-        return 2;
-    }
+    for (i = 3; i < argc; i++) {
 
-    file = fopen(argv[3], "r");
-    
-    i = 0;
-    while (true) {
-        ch = fgetc(file);
-        if (ch < 0) break;
-        stream[i] = ch;
-        i++;
-    }
-    stream[i] = '\0';
-
-    fclose(file);
-
-    // same as `i <= x;`
-    for (i = 0; i < stream_old_text_diff + 1; i++) {
-        if (is_stream_match_word(&stream[i], argv[1])) {
-            remove_chars(&stream[i], strlen(argv[1]));
-            stream = insert_string(stream, i, argv[2]);
-            stream_old_text_diff = statinfo.st_size + new_text_len - old_text_len;
+        stat(argv[i], &statinfo);
+        old_text_len = strlen(argv[1]);
+        new_text_len = strlen(argv[2]);
+        stream_old_text_diff = statinfo.st_size - old_text_len;
+        if (stream_old_text_diff < 0) {
+            fprintf(stderr, "rpl: error: OLD-TEXT larger than file\n");
+            return 1;
         }
+       
+        // + 1 for null char
+        stream = (char *)malloc((statinfo.st_size + 1) * sizeof(char));
+        if (!stream) {
+            fprintf(stderr, "rpl: error: Failed to allocate memory to read %s\n",
+                argv[i]);
+            return 2;
+        }
+
+        file = fopen(argv[i], "r");
+    
+        if (!file)
+            return 100;
+        
+        j = 0;
+        while (true) {
+            ch = fgetc(file);
+            if (ch < 0) break;
+            stream[j] = ch;
+            j++;
+        }
+        stream[j] = '\0';
+
+        j = 0;
+        while (stream[j]) {
+            if (is_stream_match_word(&stream[j], argv[1])) {
+                remove_chars(&stream[j], strlen(argv[1]));
+                stream = insert_string(stream, j, argv[2]);
+            }
+
+            j++;
+        }
+
+        fclose(file);
+        file = fopen(argv[i], "w");
+
+        fputs(stream, file);
+        
+        fclose(file);
+        free(stream);
     }
 
-    file = fopen(argv[3], "w");
-    fputs(stream, file);
-
-    fclose(file);
-    free(stream);
     return 0;
 }
