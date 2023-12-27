@@ -23,17 +23,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-// looks at beginning of stream
-bool is_stream_match_word(const char *stream, const char *word) {
-    for (int j = 0; j < strlen(word); j++) {
-        if (stream[j] != word[j]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 char *insert_string(char *insertee_string, const int index, const char *inserter_string) {
     char *new_string = 
         (char *)malloc((strlen(insertee_string) + strlen(inserter_string) + 2)
@@ -90,32 +79,30 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int i;
+    
+    char *stream;
+    FILE *file;
+    int i, j, ch, old_text_len, new_text_len;
+    struct stat statinfo;
+    
+    for (i = 3; i < argc; i++) {
 
-    for (int i = 3; i < argc; i++) {
         if (access(argv[i], F_OK)) {
 
             fprintf(stderr, "rpl: error: file not found '%s'\n", argv[i]);
             return 1;
         }
-    }
-
-    char *stream;
-    FILE *file;
-    int j, ch, old_text_len, new_text_len;
-    int stream_old_text_diff;
-    struct stat statinfo;
-    
-    for (i = 3; i < argc; i++) {
-
+        
         stat(argv[i], &statinfo);
-        old_text_len = strlen(argv[1]);
-        new_text_len = strlen(argv[2]);
-        stream_old_text_diff = statinfo.st_size - old_text_len;
-        if (stream_old_text_diff < 0) {
-            fprintf(stderr, "rpl: error: OLD-TEXT larger than file\n");
+
+        if (!(S_ISREG(statinfo.st_mode))) {
+
+            fprintf(stderr, "rpl: error: not regular file '%s'\n", argv[i]);
             return 1;
         }
+        
+        old_text_len = strlen(argv[1]);
+        new_text_len = strlen(argv[2]);
        
         // + 1 for null char
         stream = (char *)malloc((statinfo.st_size + 1) * sizeof(char));
@@ -126,10 +113,7 @@ int main(int argc, char **argv) {
         }
 
         file = fopen(argv[i], "r");
-    
-        if (!file)
-            return 100;
-        
+
         j = 0;
         while (true) {
             ch = fgetc(file);
@@ -141,12 +125,13 @@ int main(int argc, char **argv) {
 
         j = 0;
         while (stream[j]) {
-            if (is_stream_match_word(&stream[j], argv[1])) {
-                remove_chars(&stream[j], strlen(argv[1]));
+            if (!strncmp(&stream[j], argv[1], old_text_len)) {
+                remove_chars(&stream[j], old_text_len);
                 stream = insert_string(stream, j, argv[2]);
+                j += new_text_len;
             }
-
-            j++;
+            else
+                j++;
         }
 
         fclose(file);
