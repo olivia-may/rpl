@@ -1,4 +1,4 @@
-.PHONY: all test clean
+.PHONY: all rpl test tests clean
 
 all: rpl
 
